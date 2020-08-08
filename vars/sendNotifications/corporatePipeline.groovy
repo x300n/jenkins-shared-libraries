@@ -175,15 +175,10 @@ def call(body) {
         }
         steps {
           unstash 'Java 7'
-          sh "./jenkins/deploy.sh ${params.DEPLOY_TO}"
+          sh "./jenkins/deploy.sh ${pipelineParams.deployTo}"
         }
       }
     }
-    parameters {
-      string(name: 'DEPLOY_TO', defaultValue: 'dev', description: '')
-    }
+    
   }
-
-	
-
 }
