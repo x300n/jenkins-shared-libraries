@@ -178,6 +178,9 @@ def call(body) {
           sh "./jenkins/deploy.sh ${pipelineParams.deployTo}"
         }
       }
+    }	
+      options {
+	   durabilityHint('MAX_SURVIVABILITY') 
     }
     
   }
