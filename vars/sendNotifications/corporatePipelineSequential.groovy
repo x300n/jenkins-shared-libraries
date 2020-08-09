@@ -128,6 +128,7 @@ def call(body) {
     }
     options {
       durabilityHint('MAX_SURVIVABILITY')
+      preserveStashes(buildCount: 5)
     }
   }
 }
