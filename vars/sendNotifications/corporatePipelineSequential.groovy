@@ -1,186 +1,133 @@
 def call(body) {
-	
-	def pipelineParams = [:]
-	body.resolveStrategy = Closure.DELEGATE_FIRST
-	body.delegate = pipelineParams
-	body()
+  def pipelineParams= [:]
+  body.resolveStrategy = Closure.DELEGATE_FIRST
+  body.delegate = pipelineParams
+  body()
 
-	pipeline {
+  pipeline {
     agent none
     stages {
-      stage('Fluffy Build') {
+      stage('Build and Test Java') {
         parallel {
-          stage('Build Java 8') {
-            agent {
-              node {
-                label 'java8'
+          stage('java8') {
+            agent { label 'java8' }
+            stages {
+              stage("build8") {
+                steps {
+                  runLinuxScript(name: "build.sh")
+                }
+                post {
+                  success {
+                    stash(name: 'Java 8', includes: 'target/**')
+                  }
+                }
               }
-            }
-            steps {
-              sh "./jenkins/build.sh"
-            }
-            post {
-              success {
-                stash(name: 'Java 8', includes: 'target/**')
+              stage('Backend Java 8') {
+                steps {
+                  unstash 'Java 8'
+                  sh './jenkins/test-backend.sh'
+                }
+                post {
+                  always {
+                    junit 'target/surefire-reports/**/TEST*.xml'
+                  }
+                }
               }
-            }
-          }
-          stage('Build Java 7') {
-            agent {
-              node {
-                label 'java7'
+              stage('Frontend') {
+                steps {
+                  unstash 'Java 8'
+                  sh './jenkins/test-frontend.sh'
+                }
+                post {
+                  always {
+                    junit 'target/test-results/**/TEST*.xml'
+                  }
+                }
               }
-            }
-            steps {
-              runLinuxScript(name: "build.sh")
-            }
-            post {
-              success {
-                postBuildSuccess(stashName: "Java 7")
+              stage('Performance Java 8') {
+                steps {
+                  unstash 'Java 8'
+                  sh './jenkins/test-performance.sh'
+                }
               }
-            }
-          }
-        }
-      }
-      stage('Fluffy Test') {
-        parallel {
-          stage('Backend Java 8') {
-            agent {
-              node {
-                label 'java8'
-              }
-            }
-            steps {
-              unstash 'Java 8'
-              sh './jenkins/test-backend.sh'
-            }
-            post {
-              always {
-                junit 'target/surefire-reports/**/TEST*.xml'
-              }
-            }
-          }
-          stage('Frontend') {
-            agent {
-              node {
-                label 'java8'
-              }
-            }
-            steps {
-              unstash 'Java 8'
-              sh './jenkins/test-frontend.sh'
-            }
-            post {
-              always {
-                junit 'target/test-results/**/TEST*.xml'
+              stage('Static Java 8') {
+                steps {
+                  unstash 'Java 8'
+                  sh './jenkins/test-static.sh'
+                }
               }
             }
           }
-          stage('Performance Java 8') {
-            agent {
-              node {
-                label 'java8'
+          stage('java7') {
+            agent { label 'java7' }
+            stages {
+              stage("build7") {
+                steps {
+                  runLinuxScript(name: "build.sh")
+                }
+                post {
+                  success {
+                    postBuildSuccess(stashName: "Java 7")
+                  }
+                }
               }
-            }
-            steps {
-              unstash 'Java 8'
-              sh './jenkins/test-performance.sh'
-            }
-          }
-          stage('Static Java 8') {
-            agent {
-              node {
-                label 'java8'
+              stage('Backend Java 7') {
+                steps {
+                  unstash 'Java 7'
+                  sh './jenkins/test-backend.sh'
+                }
+                post {
+                  always {
+                    junit 'target/surefire-reports/**/TEST*.xml'
+                  }
+                }
               }
-            }
-            steps {
-              unstash 'Java 8'
-              sh './jenkins/test-static.sh'
-            }
-          }
-          stage('Backend Java 7') {
-            agent {
-              node {
-                label 'java7'
+              stage('Frontend Java 7') {
+                steps {
+                  unstash 'Java 7'
+                  sh './jenkins/test-frontend.sh'
+                }
+                post {
+                  always {
+                    junit 'target/test-results/**/TEST*.xml'
+                  }
+                }
               }
-            }
-            steps {
-              unstash 'Java 7'
-              sh './jenkins/test-backend.sh'
-            }
-            post {
-              always {
-                junit 'target/surefire-reports/**/TEST*.xml'
+              stage('Performance Java 7') {
+                steps {
+                  unstash 'Java 7'
+                  sh './jenkins/test-performance.sh'
+                }
               }
-            }
-          }
-          stage('Frontend Java 7') {
-            agent {
-              node {
-                label 'java7'
+              stage('Static Java 7') {
+                steps {
+                  unstash 'Java 7'
+                  sh './jenkins/test-static.sh'
+                }
               }
-            }
-            steps {
-              unstash 'Java 7'
-              sh './jenkins/test-frontend.sh'
-            }
-            post {
-              always {
-                junit 'target/test-results/**/TEST*.xml'
-              }
-            }
-          }
-          stage('Performance Java 7') {
-            agent {
-              node {
-                label 'java7'
-              }
-            }
-            steps {
-              unstash 'Java 7'
-              sh './jenkins/test-performance.sh'
-            }
-          }
-          stage('Static Java 7') {
-            agent {
-              node {
-                label 'java7'
-              }
-            }
-            steps {
-              unstash 'Java 7'
-              sh './jenkins/test-static.sh'
             }
           }
         }
       }
       stage('Confirm Deploy') {
-        when {
-          branch 'master'
-        }
+        when { branch 'master' }
         steps {
-          timeout(time: 3, unit: 'MINUTES' ) {
-            input(message: "Okay to Deploy to ${pipelineParams.deployTo}?", ok: "Let's Do it!")
+          timeout(time: 3, unit: 'MINUTES') {
+            input(message: 'Okay to Deploy to Staging?', ok: 'Let\'s Do it!')
           }
         }
       }
       stage('Fluffy Deploy') {
-        when {
-          branch 'master'
-        }
-        agent {
-          node {
-            label 'java7'
-          }
-        }
+        agent { label 'java7' }
+        when { branch 'master' }
         steps {
           unstash 'Java 7'
           sh "./jenkins/deploy.sh ${pipelineParams.deployTo}"
         }
       }
     }
-      options {
-   durabilityHint('MAX_SURVIVABILITY') 
-  }
+    options {
+      durabilityHint('MAX_SURVIVABILITY')
+    }
   }
 }
